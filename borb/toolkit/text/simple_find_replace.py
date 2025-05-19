@@ -49,6 +49,8 @@ class SimpleFindReplace:
         repl_font_color: typing.Optional[Color] = None,
         repl_font_horizontal_alignment: Alignment = Alignment.CENTERED,
         repl_font_size: typing.Optional[Decimal] = None,
+        auto_resize: bool = False,
+        min_font_size: Decimal = Decimal(6),
     ) -> Document:
         """
         This function finds and replaces a regular expression in a PDF by a given piece of text
@@ -110,21 +112,36 @@ class SimpleFindReplace:
 
                 # put Paragraph
                 if repl != "":
-                    Paragraph(
-                        repl,
-                        font=repl_font,
-                        font_size=repl_font_size,
-                        font_color=repl_font_color,
-                        horizontal_alignment=repl_font_horizontal_alignment,
-                    ).paint(
-                        page,
-                        Rectangle(
-                            bb_x - Decimal(0.5),
-                            bb_y - Decimal(0.5),
-                            bb_w + Decimal(1),
-                            bb_h + Decimal(1),
-                        ),
-                    )
-
+                    original_font_size = repl_font_size
+                    success = False
+                    
+                    while not success and (not auto_resize or repl_font_size >= min_font_size):
+                        try:
+                            Paragraph(
+                                repl,
+                                font=repl_font,
+                                font_size=repl_font_size,
+                                font_color=repl_font_color,
+                                horizontal_alignment=repl_font_horizontal_alignment,
+                            ).paint(
+                                page,
+                                Rectangle(
+                                    bb_x - Decimal(0.5),
+                                    bb_y - Decimal(0.5),
+                                    bb_w + Decimal(1),
+                                    bb_h + Decimal(1),
+                                ),
+                            )
+                            success = True
+                        except Exception as e:
+                            if auto_resize and "too tall to fit" in str(e):
+                                # Reduce font size by 10%
+                                repl_font_size = Decimal(float(repl_font_size) * 0.9)
+                            else:
+                                # Re-raise the exception if auto_resize is False or it's a different error
+                                raise
+                                
+                    # Reset font size for next replacement
+                    repl_font_size = original_font_size
         # return
         return doc
